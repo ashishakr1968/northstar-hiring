@@ -1,7 +1,7 @@
 # Submission
 
 - Repository: https://github.com/ashishakr1968/northstar-hiring
-- Live application: Not deployed (runs locally with SQLite; see notes below).
+- Live application: https://northstar-hiring.onrender.com
 - The local demo is seeded at first start.
 
 ## Demo credentials
@@ -13,28 +13,16 @@
 
 ### Deployment
 
-This application can be deployed on free tiers. Recommended approach:
+This application is deployed on Render.com (free tier). See live URL above.
 
-**Render.com** (as specified in the instructions):
-1. Create a free account at render.com
-2. New Web Service -> Docker
-3. Connect GitHub repository: `ashishakr1968/northstar-hiring`
-4. Set environment variable: `DATABASE_PATH=pipeline.db`
-5. Service will auto-deploy from main branch
-6. Free tier: 750 hours/month, services sleep after 15 min of inactivity
-7. First load may take 1-2 minutes to wake from sleep
+**Render.com characteristics:**
+- Free tier: 750 hours/month, services sleep after 15 min of inactivity
+- First load may take 1-2 minutes to wake from sleep
+- Docker-based deployment from GitHub repository
+- Environment variable: `DATABASE_PATH=pipeline.db`
 
-**Alternative: PythonAnywhere**
-1. Create a free account at pythonanywhere.com
-2. Set up a virtualenv with: fastapi, uvicorn, python-multipart
-3. Copy app.py, requirements.txt, Dockerfile
-4. Configure WSGI entry point
-5. Set DATABASE_PATH=pipeline.db as a environment variable
-6. Web app URL: https://<username>.pythonanywhere.com
-
-**Note:** The application uses SQLite locally with `DATABASE_PATH` environment variable.
-For production, swap the data layer for managed Postgres (Supabase, Railway, etc.).
-Free services may sleep when idle and can take a minute or more to wake.
+**Alternative deployment:**
+- PythonAnywhere, Railway, or any Python-compatible free tier
 
 ## Local development
 
