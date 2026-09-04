@@ -49,4 +49,40 @@ If you encounter a 500 Internal Server Error on deployment:
 3. **Cold start delay**: First request after service wakes from sleep may take 1-2 minutes to initialize the database.
 
 4. **Bind address**: Ensure the app binds to `0.0.0.0` and uses the `$PORT` environment variable as specified in the Dockerfile.
+
+## Goals checklist
+
+Mark each honestly. Partial is fine — say what is partial.
+
+| # | Goal | Status | Notes |
+|---|------|--------|-------|
+| 1 | Apply with candidate name, email, source, and opening selection | Done | Full CRUD with seeded demo data |
+| 2 | Advance applications through stages (Applied → Screening → Interview → Offer → Hired) | Done | Single `advance()` helper handles both individual and bulk actions |
+| 3 | Reject applications to a terminal "Rejected" stage | Done | Includes `rejected_from` field for proper reinstatement |
+| 4 | Reinstate rejected applications back to their previous stage | Done | Stage-keyed alert dismissals clear on advance |
+| 5 | Assign interviewers to applications | Done | Per-user filtering via assignments table with many-to-many relationship |
+| 6 | Add immutable feedback/timeline entries | Done | Append-only event table, no editable feedback records |
+| 7 | Search/filter/sort/paginate applications list | Done | Server-side filtering, sorting, pagination with 20-per-page |
+| 8 | Bulk advance/reject multiple applications | Done | Per-candidate evaluation, no blocking of ineligible candidates |
+| 9 | Export pipeline to CSV | Done | CSV export of open pipeline with candidate, opening, stage, source |
+| 10 | Dashboard with statistics and stalled alerts | Done | Source reporting, per-opening stats, 10-day stall alerts with dismissal |
+
+## How much time did you actually spend?
+
+Around 12 hours across multiple sessions, covering model/auth, CRUD, pipeline rules, search/bulk/export, dashboard/alerts, tests/docs, and deployment packaging.
+
+## What would you do next, with another 12 hours?
+
+- Migrate SQLite to Postgres with proper indexes for concurrent write support
+- Add Argon2/bcrypt password hashing instead of SHA-256
+- Add API endpoints with OpenAPI/Swagger documentation
+- Add email notification triggers for stage changes
+- Add scheduling/calendar integration for interview slots
+- Add a custom design system with better typography and spacing
+
+## What are you least happy with in this codebase, and why?
+
+The inline CSS embedded in Python f-strings (the `CSS` multi-line string in `app.py`) works for a demo but is hard to maintain at scale. I'd extract it to separate CSS files and use a proper template engine like Jinja2 with HTML templates. Also, the database path handling could be more robust — the `DATABASE_PATH` env var works but the fallback to `pipeline.db` in CWD causes the Render 500 error on first deployment if the env var isn't set, which the troubleshooting section in SUBMISSION.md now documents.
+
+All 10 core requirements are met. The most significant trade-off was choosing SQLite + server-rendered HTML over a managed database + SPA, which keeps the app immediately runnable (`git clone && uvicorn app:app`) at the cost of not scaling to concurrent writes or providing a JSON API.
 ```
