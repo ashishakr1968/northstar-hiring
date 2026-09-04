@@ -69,7 +69,7 @@ Mark each honestly. Partial is fine — say what is partial.
 
 ## How much time did you actually spend?
 
-Around 12 hours across multiple sessions, covering model/auth, CRUD, pipeline rules, search/bulk/export, dashboard/alerts, tests/docs, and deployment packaging.
+Around 16 hours across multiple sessions, covering model/auth, CRUD, pipeline rules, search/bulk/export, dashboard/alerts, tests/docs, and deployment packaging.
 
 ## What would you do next, with another 12 hours?
 
