@@ -1,51 +1,179 @@
 # Architecture
 
-Northstar Hiring is a server-rendered FastAPI application that manages a recruiting pipeline. The system is designed around the principle of server-owned data: all authorization, filtering, pagination, and sorting decisions are made on the backend, never relying on client-side state.
-
 ## Overview
 
-The application follows a request-response pattern where:
-- **Browser:** Sends HTML forms and navigation requests. It has no JavaScript state persistence, no local caching of pipeline data, and no decision-making authority over authorization or stage transitions.
-- **FastAPI application (`app.py`):** Contains all route handlers, authentication logic, role-based access control, pipeline business rules, HTML rendering with embedded CSS (inline in `app.py`), CSV export, and form processing. The app owns all data queries.
-- **SQLite database:** Stores all persistent state — users, openings, applications, panel assignments, append-only timeline events, and alert dismissals. The schema is deliberately conventional and production-migration-friendly (conventional enough to move to Postgres with minimal changes).
+Northstar Hiring is a small server-rendered hiring pipeline application built with FastAPI and SQLite.
 
-## Moving pieces
+The application follows a simple request-response architecture. A browser sends a page request or form submission to the FastAPI server. The server authenticates the user, checks their role, validates the requested operation, applies the relevant business rules, reads or updates SQLite, and returns HTML or a CSV response.
 
-- **Browser:** Simple HTML forms and navigation. Never decides authorization or a legal stage change.
-- **FastAPI application (`app.py`):** Routes, authentication via signed cookies, role checks, pipeline rules, HTML rendering with embedded CSS, CSV export, and form processing.
-- **SQLite:** Durable relational data for users, job openings, applications, panel assignments, append-only events (timeline), and alert dismissals. Schema is conventional enough to migrate to Postgres production.
+The application keeps the important business rules on the server. The browser is responsible mainly for displaying information and submitting forms.
 
-## Request lifecycle example: advance an application
+## Main Components
 
-1. A recruiter submits `POST /applications/{id}/advance`.
-2. The server resolves the user from the signed cookie and rejects anyone without the recruiter role (HTTP 401/403).
-3. It reads the current application state in a single transaction, calculates the immediate next stage from the ordered stage list (`Applied → Screening → Interview → Offer → Hired`), and refuses terminal (Hired) or rejected applications.
-4. On success: updates `stage` and `stage_changed_at`, clears prior alert dismissals for that application (movement resets the 10-day stall timer), inserts a timeline event with the actor and old/new stages, and issues a 303 redirect to the application page.
-5. The redirected page reads the new state and timeline from SQLite and renders the HTML response with the updated stage badge and timeline.
+### Browser
 
-## Deliberate omissions
+The browser provides:
 
-The following are intentionally not built (they are outside the ten core goals scope):
+- HTML forms
+- Candidate and opening views
+- Navigation
+- Search and filtering controls
+- Pipeline actions
+- Interviewer feedback forms
+- Dashboard and alert views
+- CSV export access
 
-| Category | Items |
-| --- | --- |
-| **Candidate-facing** | Public careers page, candidate self-service, resume parsing, document upload |
-| **Communication** | Email delivery, notification system, SMS alerts |
-| **Evaluation** | Scorecards, candidate rating systems, grading rubrics |
-| **Scheduling** | Calendar integration, interview scheduling, availability polling |
-| **Security (beyond auth)** | CSRF protection, secure session storage (beyond signed cookies), rate limiting, brute-force protection |
-| **Infrastructure** | Database migrations, schema versioning, connection pooling, managed Postgres |
-| **Observability** | Structured logging, application metrics, health checks, APM integration |
-| **Frontend** | React/Vue SPA, custom design system, client-side routing, state management |
+The browser does not determine whether a user is authorized to perform an operation or whether a stage transition is valid.
 
-Production hardening would require: Argon2/bcrypt password hashing, managed Postgres database, API endpoints with OpenAPI/Swagger docs, React or Vue SPA with typed API client, enterprise-grade security headers, and comprehensive observability stack.
+### FastAPI Application
 
-## HTML rendering approach
+The main application is contained in `app.py`.
 
-The app uses inline CSS within Python f-strings (the `CSS` multi-line string in `app.py`) rather than a separate template engine or static CSS file. This choice was made to:
-- Keep the application self-contained (single file, no external assets)
-- Avoid build steps or template compilation
-- Simplify deployment (Docker copy only `app.py` and `requirements.txt`)
-- Enable rapid iteration on UI changes
+It is responsible for:
 
-The trade-off is limited CSS maintainability for a demo-sized codebase. In production, this would be extracted to SCSS/CSS files and served statically.
+- Authentication
+- Session handling
+- Role-based access control
+- Candidate and opening CRUD operations
+- Pipeline transition rules
+- Rejection and reinstatement
+- Interviewer assignments
+- Interviewer feedback
+- Candidate history
+- Bulk operations
+- Search, filtering, sorting, and pagination
+- Dashboard metrics
+- Stalled candidate alerts
+- CSV export
+- HTML rendering
+
+Keeping these responsibilities in one application makes the project easy to run and review within the scope of the assignment.
+
+### SQLite
+
+SQLite stores the application data locally.
+
+The main tables are:
+
+- `users`
+- `sessions`
+- `openings`
+- `applications`
+- `assignments`
+- `events`
+- `alert_dismissals`
+
+Foreign keys are enabled and indexes are created for commonly queried fields.
+
+## Authentication and Authorization
+
+Authentication uses a database-backed session.
+
+Passwords are not stored in plaintext. The application uses PBKDF2-HMAC-SHA256 with a random salt for password hashing.
+
+After successful login, a random session token is generated. Only its SHA-256 hash is stored in the database. The browser receives the session token through an HTTP-only cookie.
+
+Role checks are performed on the server. The two supported roles are:
+
+- Recruiter
+- Interviewer
+
+Recruiters can manage openings and applications and perform pipeline operations.
+
+Interviewers can access applications assigned to them and provide interview feedback. They cannot access recruiter-only operations.
+
+## Pipeline Rules
+
+The normal pipeline is:
+
+`Applied → Screening → Interview → Offer → Hired`
+
+The application does not allow arbitrary stage editing.
+
+A normal advancement moves an application only to the immediate next stage. Terminal or rejected applications cannot be advanced through the normal advancement route.
+
+Rejection is represented separately using the `Rejected` stage and the `rejected_from` field.
+
+When a candidate is rejected, the stage from which they were rejected is preserved. Reinstatement uses that value to return the candidate to the exact previous stage.
+
+## History
+
+Important application changes are recorded in the append-only `events` table.
+
+Events can record:
+
+- Application creation
+- Stage changes
+- Rejection
+- Reinstatement
+- Other relevant workflow activity
+- Interviewer feedback
+
+Existing events are treated as historical records rather than editable application state.
+
+This allows a reviewer to inspect how a candidate moved through the pipeline.
+
+## Stalled Alerts
+
+Stalled alerts are calculated from the candidate's current stage and `stage_changed_at`.
+
+The thresholds are:
+
+- Screening: more than 10 days
+- Interview: more than 10 days
+- Offer: more than 14 days
+
+Alert dismissal is stored against both the application and its stage.
+
+When an application changes stage, previous dismissal records are cleared. This means that a candidate can be dismissed at one stage and still receive a new alert if they later become stalled at another stage.
+
+## Search and Listing
+
+Candidate search, filtering, sorting, and pagination are performed on the server.
+
+The browser sends the selected parameters to the application, and SQLite performs the relevant filtering and ordering before the result is rendered.
+
+This avoids depending on client-side filtering of the complete dataset.
+
+## Security Measures
+
+The application includes:
+
+- Password hashing using PBKDF2-HMAC-SHA256
+- Random session tokens
+- Database-backed sessions
+- HTTP-only session cookies
+- SameSite cookie protection
+- CSRF tokens for state-changing forms
+- Server-side role checks
+- Server-side validation of pipeline transitions
+- HTML escaping of user-controlled values
+- SQLite parameterized queries
+- Foreign-key enforcement
+
+The implementation is intentionally small and self-contained for the assignment.
+
+## Deployment
+
+The application can run locally with SQLite and is packaged with a Dockerfile for deployment.
+
+The deployed demonstration uses Render. The application does not require a separate database service for the basic demonstration.
+
+For a production system, persistent managed database storage would be preferable.
+
+## Deliberate Scope
+
+The project focuses on the requirements of the assignment.
+
+The following features were intentionally not implemented:
+
+- Public careers portal
+- Resume parsing
+- Email delivery
+- External calendar integration
+- Automated interview scheduling
+- Candidate self-service accounts
+- Advanced analytics
+- Managed production database infrastructure
+
+These features were outside the core assignment requirements and would add complexity without improving the demonstration of the required workflow rules.
