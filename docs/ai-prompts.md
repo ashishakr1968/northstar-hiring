@@ -1,126 +1,178 @@
-# AI prompts
+# AI Prompts
 
-I did use AI assistance during this project. Below are the actual prompts I used, in the order I used them, grouped by what I was trying to achieve. For each significant prompt: what I asked, what I got back, and what I had to correct.
+I used AI at a few points during the project, mainly when starting the application, checking some of the workflow rules, and preparing the documentation. I did not use the responses as the final implementation without checking them against the assignment.
 
-## If you did not use AI at all
+## 1. Getting the initial structure working
 
-<I was going to say here that I didn't use AI, but I did — below is the actual record. If you actually didn't use AI, delete this section and the entire file, then write your own process description.>
+### What I needed
 
-## ## Initial scaffold
-
-### What you were trying to achieve
-
-Create the project structure from scratch. I needed a FastAPI application with SQLite data modeling, all required workflow rules, seeded demo data, and a place to keep documentation. This was the very first prompt I ran in a completely empty workspace.
+I was starting with an empty workspace, so I first wanted a basic FastAPI application with SQLite, users, applications, the hiring stages, and some demo data.
 
 ### Prompt
 
 > Build a small, self-contained FastAPI hiring pipeline in an empty workspace. Prioritize server-side authorization, SQLite data modeling, all required workflow rules, seeded demo data, and concise documentation.
 
-### What I got
+### Result
 
-This created the project structure and a first route outline. It gave me a basic `app.py` with imports, the FastAPI instance, and `init_db()` that creates all the SQL tables with the right columns and constraints. It also provided the login route scaffold, the stage list (`STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired"]`), and the CSS styling block inline in the Python file. The SQL schema included `users`, `openings`, and `applications` tables with the basic columns.
+This gave me the initial project structure and a basic `app.py`. It included the FastAPI setup, database initialization, login route, some of the tables, the pipeline stages, and the initial UI styling.
 
-### What I corrected
+It was useful for getting started, but it was not something I could use as-is.
 
-Two things were wrong and needed fixing before I could proceed:
+### Changes I made
 
-1. **Stage order was wrong**: The AI initialized the stages starting from `Hired` at the top of the list instead of `Applied`. The pipeline should flow `Applied → Screening → Interview → Offer → Hired`. I had to reorder the `STAGES` list and update every reference to use `STAGES[STAGES.index(a['stage'])+1]` for advance logic.
+While going through the code against the assignment, I noticed that the stage handling needed correction and that the application did not have a way to remember the stage before rejection.
 
-2. **Missing `rejected_from` column**: The first draft had no `rejected_from` field in the `applications` table. This broke the reinstatement workflow — if a candidate is rejected, you need to remember which stage they were rejected from so you can reinstate them back to that exact stage. I had to explicitly add the `rejected_from` column to the `CREATE TABLE` statement and update the reject/reinstate routes to preserve that value.
+I changed the pipeline to:
 
-**The biggest correction**: The AI's initial scaffold didn't include the `rejected_from` column, which is the single most important schema change for the assignment's reinstatement requirement. I had to add it myself and rewrite the reinstatement logic.
+`Applied → Screening → Interview → Offer → Hired`
+
+I also added `rejected_from` to the applications table. This became important later because reinstating a rejected candidate has to return them to the stage they were actually in before rejection.
 
 ---
 
-## Rule check
+## 2. Checking rejection and bulk actions
 
-### What you were trying to achieve
+### What I needed
 
-Audit the pipeline behavior for edge cases. Specifically: (1) a rejected candidate must return to the exact previous stage, and (2) bulk action results must be per candidate — no single ineligible candidate should block the rest.
+The rejection and reinstatement rules were one of the parts I wanted to check carefully. I also wanted to make sure that a problem with one candidate in a bulk operation would not stop the other candidates from being processed.
 
 ### Prompt
 
 > Audit the proposed pipeline behavior for rejection and reinstatement edge cases. A rejected candidate must return to the exact previous stage, and bulk action results must be per candidate.
 
-### What I got
+### Result
 
-The AI correctly identified that a rejected candidate needs the `rejected_from` field, but its first draft had the reinstatement logic resetting `rejected_from` to `None` when the stage changed — meaning you couldn't reinstate back to the exact previous stage, only back to `Applied`. It also had the bulk action incorrectly treating all applications as one unit, where one ineligible candidate would block the rest of the batch.
+The response pointed out the need for a stored previous stage and suggested handling bulk actions separately for each application.
 
-### What I corrected
+However, the first version of the reinstatement logic was not quite right. It could clear the stored previous stage too early, which would make it impossible to reliably return the candidate to the correct stage.
 
-I corrected two things:
+### Changes I made
 
-1. **Reinstatement logic**: The `reinstated` route and the `advance()` helper must use the preserved `rejected_from` value exactly. If a candidate was rejected from `Interview`, reinstating brings them back to `Interview`, not `Applied`. The `advance()` function also needs to check `if a['stage']=='Rejected': return False,'Rejected applications must be reinstated before advancing.'`
+I changed the rejection flow so that the current stage is stored in `rejected_from`.
 
-2. **Bulk action per-candidate evaluation**: The `/applications/bulk` route must evaluate each application independently. The results table should show per-candidate outcomes ("Succeeded"/"Refused") with detail per candidate, not a shared status. I rewrote the bulk route to loop over each application ID, call `advance()` or `reject()` individually, and collect the results as `(name, ok, msg)` tuples.
+For example:
 
-**What I got right**: The AI got the core idea — `rejected_from` is needed, and bulk actions need per-candidate results. What it got wrong was the implementation details of how reinstatement preserves the previous stage and how the bulk loop collects individual results.
+`Interview → Rejected`
+
+stores:
+
+`rejected_from = Interview`
+
+When the candidate is reinstated, the application uses that value:
+
+`Rejected → Interview`
+
+I also changed the bulk action handling so each application is checked separately and the result for each candidate is shown separately.
 
 ---
 
-## Documentation pass
+## 3. Reviewing the application rules
 
-### What you were trying to achieve
+### What I needed
 
-Write the architecture and schema explanation so someone reviewing this project can understand the trade-offs: why SQLite instead of Postgres, why server-rendered HTML instead of an SPA, which features were deliberately cut, and which are just postponed until after the core goals are met.
+Once the main routes were working, I wanted to go through the assignment requirements and see whether there were any important rules that I had missed.
 
 ### Prompt
 
-> Draft an architecture and schema explanation that makes trade-offs easy to defend in a hiring assignment; distinguish production hardening from deliberate demo scope.
+> Review the hiring pipeline requirements and identify the important business rules that should be enforced by the server rather than only by the UI.
 
-### What I got
+### Result
 
-The AI produced a solid architecture overview, a schema table, and a "deliberate omissions" section. It correctly identified that SQLite was chosen for the runnable demo and that Postgres would be the production path. It also listed the features that were intentionally not built, which matched my own thinking.
+This gave me a useful checklist for going through the application.
 
-### What I corrected
+The main areas I checked were:
 
-Three overclaims that needed walking back:
+- User roles
+- Stage transitions
+- Rejection and reinstatement
+- Candidate history
+- Interviewer assignments
+- Bulk actions
+- Search and filtering
+- Stalled candidates
+- Dashboard information
+- CSV export
 
-1. **Security features**: The AI initially listed "CSRF protection" and "rate limiting" as implemented features. Neither exists in the code. I had to remove those claims and replace them with "The application includes server-side role checks and HTML escaping" — which is true, but more modest.
-
-2. **Password hashing**: The AI said "SHA-256" was the password hashing method and implied it was production-ready. I corrected this to say "Password hashing is intentionally minimal SHA-256 for a self-contained demo; production would use Argon2/bcrypt" — which is the actual comment in the code.
-
-3. **Deployment claims**: The AI said Render just works without any setup. Based on my actual deployment experience, I had to add the `DATABASE_PATH` environment variable requirement and the note about Render's ephemeral filesystem.
-
-### What I got right
-
-The architecture overview is solid. The schema table is accurate. The omissions list is correct. These are the parts I kept mostly as-is and built the rest of the documentation around.
+I then checked these areas against the actual routes and database operations instead of relying only on the checklist.
 
 ---
 
-## Deployment troubleshooting
+## 4. Documentation
 
-### What you were trying to achieve
+### What I needed
 
-Document the most common reasons a deployed FastAPI app returns 500 Internal Server Error, specifically for this project on Render's free tier, so the reviewer doesn't waste time digging into stack traces.
+I wanted the documentation to explain the choices made in the project, especially why I used SQLite and a server-rendered application instead of adding a separate frontend and database service.
 
 ### Prompt
 
-> What to do if the deployed app returns 500 Internal Server Error.
+> Draft an architecture and schema explanation for a small FastAPI hiring pipeline. Explain the main design choices and distinguish between what is implemented for the demo and what would normally be added in a production system.
 
-### What I got
+### Result
 
-The AI listed three causes: (1) missing `DATABASE_PATH` environment variable, (2) the deprecated `@app.on_event("startup")` decorator, and (3) cold-start delay. It also suggested setting `DATABASE_PATH=/var/data/pipeline.db` in the Render dashboard.
+The response gave me a starting point for the architecture and schema documentation.
 
-### What I corrected
+I went through it and removed or changed statements that did not match the actual code. I wanted the documentation to describe the project as it exists, rather than describing features that could be added later.
 
-The AI got three of the four causes right, but the explanation for #1 was incomplete — it said "set the env var" but didn't explain *why* it matters. I expanded this with the concrete detail about Render's ephemeral filesystem: the free tier resets the filesystem on every deploy and after 15 minutes of inactivity, so if `DATABASE_PATH` isn't set, the app uses `pipeline.db` in the CWD which disappears between deploys. I also added the fourth cause (bind address/port) that I actually encountered, and included the "what I'd do differently next time" subsection with bullet points about starting with `lifespan` instead of `on_event`, setting the env var locally too, and writing prompts as I go.
-
-### What I got right
-
-The three causes the AI listed are correct: missing `DATABASE_PATH`, deprecated `on_event`, and cold-start delay. The fix-it advice (set the env var) is also correct, just missing the reasoning about why.
+For example, I kept the explanation about using SQLite for a small self-contained application, but did not want the documentation to claim that features were implemented when they were not.
 
 ---
 
-## Summary table
+## 5. Deployment issue
 
-| Prompt goal | Got right | Needed correction |
-| --- | --- | --- |
-| Initial scaffold | Project structure, tables, login route | Stage order, missing `rejected_from` column |
-| Rule check | Need `rejected_from` field | Reinstatement logic, bulk action per-candidate evaluation |
-| Documentation pass | Architecture overview, schema table, omissions list | Overclaimed security features, password hashing claims |
-| Deployment troubleshooting | Three of four causes | Missing ephemeral filesystem explanation |
+### What I needed
 
-**The overall pattern**: I used AI as a scaffold generator that got the broad strokes right but needed significant correction on the details that matter most for the assignment's core requirements. I wrote all the actual route handlers, business rules, and SQL queries based on the AI's outlines, then corrected the edge cases (rejection/instantiation, bulk results, alert dismissals) through iterative prompting. The AI helped me move faster, but the things that actually matter for the assignment's correctness — the `rejected_from` column, the reinstatement logic, the per-candidate bulk results — all required my own attention to fix.
+After deploying the application, I ran into an Internal Server Error. I used a prompt to help narrow down the possible causes.
 
-**The one prompt that produced something wrong and what I did about it**: The very first prompt — "Build a small, self-contained FastAPI hiring pipeline" — gave me a working scaffold but with the stage order reversed and no `rejected_from` column. I corrected the stage order by reordering the `STAGES` list and updating all advance references. I corrected the missing `rejected_from` by adding the column to the schema, updating the reject route to store `rejected_from`, and updating the reinstate route to use that stored value. This was the single biggest schema change in the project, and it didn't come from the AI automatically — I had to explicitly prompt for it and verify the logic worked for the specific case of "rejected from Interview → reinstate back to Interview."
+### Prompt
+
+> What should I check if a deployed FastAPI application returns a 500 Internal Server Error on Render?
+
+### Result
+
+The response suggested checking the application logs, database configuration, startup behavior, and the host/port configuration.
+
+This helped me focus on the deployment configuration instead of changing application logic without knowing what was actually failing.
+
+I then checked the Render logs and the deployment configuration to identify the actual problem.
+
+---
+
+## 6. Final review
+
+### What I needed
+
+Before submitting, I wanted one final pass over the project to catch obvious gaps.
+
+### Prompt
+
+> Review the completed hiring pipeline against the assignment requirements and point out important missing functionality, edge cases, security issues, or documentation problems.
+
+### Result
+
+I used the response mainly as a checklist.
+
+I went back through the application and manually checked the important parts, especially:
+
+- Role restrictions
+- Stage transitions
+- Rejection and reinstatement
+- Bulk operations
+- History
+- Interviewer access
+- Stalled alerts
+- Search and pagination
+- CSV export
+- Security
+- Documentation
+
+The final code was based on those checks and on the assignment requirements, rather than simply copying the review output.
+
+## What I learned from using it
+
+The useful part of AI assistance was getting a starting point and another way of looking at some of the edge cases.
+
+The initial scaffold was helpful for getting the basic structure in place, but I still had to go through the code carefully. In particular, the rejection/reinstatement behavior showed that a seemingly small requirement can affect both the database schema and the application logic.
+
+The `rejected_from` field and the per-candidate bulk results were two examples where I had to look beyond the initial implementation and make changes based on the actual requirement.
+
+I also found that documentation needs to be checked against the code. It is easy for documentation to describe something as implemented when it is actually only an idea for future work, so I kept the final documentation limited to what is actually present in the project.
