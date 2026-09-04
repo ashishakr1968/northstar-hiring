@@ -19,7 +19,299 @@ SOURCE_OPTIONS = ["Referral", "Careers page", "LinkedIn", "Agency", "Inbound"]
 
 CSS = """
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f8fc;color:#152033;font:14px Inter,system-ui,sans-serif}nav{background:#17243d;color:#fff;padding:15px 5vw;display:flex;gap:18px;align-items:center}nav a{color:#dce7ff;text-decoration:none}.brand{font-weight:800;color:#fff!important;font-size:17px;margin-right:auto}.badge{background:#f0a33d;color:#17243d;padding:2px 7px;border-radius:10px;font-weight:800}main{max-width:1180px;margin:28px auto;padding:0 20px}h1{font-size:27px;margin:0 0 7px}h2{font-size:18px;margin-top:0}.muted{color:#68758b}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card,form,.panel{background:#fff;border:1px solid #e4e8f0;border-radius:10px;padding:17px;box-shadow:0 1px 2px #16274d08}.metric b{display:block;font-size:30px;margin-top:8px}.split{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e4e8f0;border-radius:10px;overflow:hidden}th,td{text-align:left;padding:11px;border-bottom:1px solid #edf0f5}th{font-size:12px;color:#657186;text-transform:uppercase;background:#fafbfe}tr:last-child td{border:0}a{color:#315cc5}button,.button{background:#315cc5;color:#fff;border:0;border-radius:6px;padding:8px 12px;font:inherit;text-decoration:none;cursor:pointer;display:inline-block}button.secondary,.button.secondary{background:#e9edf5;color:#26354e}button.danger{background:#bf3b4c}.stage{font-size:12px;padding:4px 8px;border-radius:12px;background:#e9eefb;color:#28468a;white-space:nowrap}.rejected{background:#fce7ea;color:#aa2537}.flash{padding:10px 13px;border-radius:7px;background:#fff0d9;color:#805309;margin-bottom:15px}.error{background:#fce7ea;color:#9e2635}input,select,textarea{width:100%;padding:8px;border:1px solid #cdd5e2;border-radius:6px;margin:4px 0 11px;font:inherit}label{font-size:12px;font-weight:700;color:#566276}.row{display:flex;gap:10px;align-items:end}.row>*{flex:1}.actions{display:flex;gap:8px;flex-wrap:wrap}.timeline{border-left:2px solid #d9e1ee;padding-left:16px}.event{padding:0 0 16px}.event small{color:#68758b;display:block;margin-top:3px}.filters{display:grid;grid-template-columns:2fr repeat(4,1fr);gap:9px;margin-bottom:15px}.alert{border-left:4px solid #e4962c;padding:11px;background:#fffaf1;margin:8px 0}.right{margin-left:auto}@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.row{display:block}}
+:root{
+  --bg:#f8f9fa;
+  --ink:#1a1a2e;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --card:#ffffff;
+  --radius:12px;
+  --danger:#dc2626;
+  --success:#2563eb;
+  --primary:#1e40af;
+  --primary-soft:#e0f2fe;
+  --accent:#f59e0b;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font:15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.5;
+}
+.skip{position:absolute;left:-999px}.skip:focus{left:16px;top:12px;z-index:20;background:#fff;padding:8px;border-radius:6px}
+nav{
+  background:var(--ink);
+  padding:16px max(20px,calc((100vw - 1200px)/2));
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  box-shadow:0 2px 8px #00000015;
+}
+nav a{
+  color:#e5e7ff;
+  text-decoration:none;
+  padding:8px 12px;
+  border-radius:8px;
+  font-size:14px;
+}
+nav a:hover,nav a:focus{
+  background:#ffffff33;
+  color:#fff;
+}
+.brand{
+  font-weight:800;
+  color:#fff!important;
+  font-size:18px;
+  margin-right:auto;
+  padding-left:0!important;
+}
+.user-chip{
+  color:#dce7ff;
+  font-size:13px;
+  padding:7px 9px;
+}
+.badge{
+  background:#f59e0b;
+  color:#34230a;
+  padding:2px 7px;
+  border-radius:10px;
+  font-size:12px;
+  font-weight:800;
+}
+.main{max-width:1200px;margin:40px auto;padding:0 24px}
+h1{
+  font-size:clamp(26px,4vw,34px);
+  letter-spacing:-.03em;
+  line-height:1.15;
+  margin:0 0 12px;
+  color:var(--ink);
+}
+h2{
+  font-size:18px;
+  margin:0 0 10px;
+  padding-bottom:4px;
+  border-bottom:2px solid var(--line);
+  color:var(--ink);
+}
+p{margin:0 0 12px}
+.muted{color:var(--muted)}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:16px;
+}
+@media(max-width:1200px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){body{font-size:14px}.main{padding:16px 12px}.grid{grid-template-columns:1fr}.brand{width:100%;margin-bottom:6px}}
+.card,.panel,form{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+  box-shadow:0 2px 8px #00000008;
+}
+.metric{
+  border-top:4px solid var(--primary);
+}
+.metric b{
+  display:block;
+  font-size:34px;
+  line-height:1;
+  margin-top:12px;
+  color:var(--ink);
+}
+.split{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+  margin-top:24px;
+}
+.table-wrap{
+  overflow-x:auto;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:#fff;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:560px;
+}
+th,td{
+  text-align:left;
+  padding:13px 14px;
+  border-bottom:1px solid #f3f4f6;
+  vertical-align:middle;
+}
+th{
+  font-size:10px;
+  letter-spacing:.05em;
+  color:#6b728c;
+  text-transform:uppercase;
+  background:#f9fafb;
+}
+tbody tr:hover{background:#fafbfe}
+tbody tr:last-child td{border:0}
+a{
+  color:#1e40af;
+  text-decoration:none;
+}
+a:hover{color:#1d4ed8}
+button,.button{
+  appearance:none;
+  background:var(--primary);
+  color:#fff;
+  border:1px solid var(--primary);
+  border-radius:8px;
+  min-height:44px;
+  padding:9px 14px;
+  font:600 14px inherit;
+  text-decoration:none;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  transition:opacity .15s;
+}
+button:hover,.button:hover{
+  background:#2563eb;
+  color:#fff;
+}
+button:focus-visible,a:focus-visible,input:focus,select:focus,textarea:focus{
+  outline:3px solid #60a5fa;
+  outline-offset:2px;
+}
+button.secondary,.button.secondary{
+  background:#fff;
+  color:#1f2937;
+  border-color:#d1d5db;
+}
+button.secondary:hover,.button.secondary:hover{
+  background:#f9fafb;
+  color:#111827;
+}
+button.danger{
+  background:var(--danger);
+  border-color:var(--danger);
+}
+button.danger:hover{
+  background:#b91c1c;
+  color:#fff;
+}
+input,select,textarea{
+  width:100%;
+  min-height:44px;
+  padding:9px 10px;
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#fff;
+  color:var(--ink);
+  margin:8px 0 16px;
+  font:inherit;
+}
+textarea{
+  min-height:120px;
+  resize:vertical;
+}
+label{
+  display:block;
+  font-size:13px;
+  font-weight:600;
+  color:#374151;
+  margin-bottom:6px;
+}
+.row{
+  display:flex;
+  gap:12px;
+  align-items:end;
+  flex-wrap:wrap;
+}
+.row>*{flex:1}
+.actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.right{margin-left:auto}
+.timeline{
+  border-left:2px solid var(--line);
+  padding-left:18px;
+}
+.event{
+  position:relative;
+  padding:0 0 16px;
+}
+.event:before{
+  content:"";
+  position:absolute;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--primary);
+  left:-19px;
+  top:6px;
+}
+.event small{
+  color:var(--muted);
+  display:block;
+  margin-top:3px;
+}
+.filters{
+  display:grid;
+  grid-template-columns:2fr repeat(4,1fr) auto;
+  gap:12px;
+  margin-bottom:16px;
+  align-items:center;
+}
+.filters input,.filters select,.filters button{margin:0}
+.alert{
+  border-left:4px solid var(--accent);
+  border-radius:8px;
+  padding:14px 16px;
+  background:#fffbf6;
+  color:#92400e;
+  margin:12px 0;
+}
+.alert b{
+  color:#92400e;
+}
+.empty{
+  padding:24px;
+  text-align:center;
+  color:var(--muted);
+}
+.step{
+  padding:5px 9px;
+  border-radius:99px;
+  background:#e5e7eb;
+  color:#6b7280;
+  font-size:12px;
+  font-weight:700;
+}
+.step.current{
+  background:var(--primary);
+  color:#fff;
+}
+.chip{
+  display:inline-block;
+  padding:3px 8px;
+  border-radius:18px;
+  font-size:11px;
+  font-weight:700;
+  background:#e5e7eb;
+  color:#374151;
+  margin-right:4px;
+  margin-bottom:4px;
+}
+.chip.referral{background:#e0f2fe;color:#0891b2}
+.chip{careers}{background:#f0f4f8;color:#3182ce}
+.chip{linkedin}{background:#f0f4f8;color:#3182ce}
+.chip{agency}{background:#f0f4f8;color:#3182ce}
+.chip{inbound}{background:#f0f4f8;color:#3182ce}
 </style>"""
 
 @contextmanager
@@ -134,8 +426,21 @@ def dashboard(request: Request, message: str=""):
             by_opening=con.execute("SELECT o.title,count(a.id) total FROM openings o LEFT JOIN applications a ON a.opening_id=o.id WHERE o.status='open' GROUP BY o.id").fetchall()
             by_stage=con.execute("SELECT stage,count(*) total FROM applications GROUP BY stage").fetchall()
             weeks=con.execute("SELECT strftime('%Y-%W',applied_at) week,count(*) total FROM applications WHERE applied_at >= date('now','-3 months') GROUP BY week ORDER BY week").fetchall()
-            charts=''.join(f'<tr><td>{x["week"]}</td><td>{x["total"]}</td><td><div style="height:8px;background:#315cc5;width:{min(x["total"]*35,300)}px;border-radius:4px"></div></td></tr>' for x in weeks) or '<tr><td colspan="3">No applications this quarter.</td></tr>'
-            body=f'<h1>Pipeline overview</h1><p class="muted">A live view of recruiting work across open positions.</p><div class="grid">{metric("Open positions",open_count)}{metric("Active applications",active)}{metric("Interviews scheduled",scheduled)}{metric("Hires this month",hires)}</div><div class="split"><section class="panel"><h2>Applications by opening</h2>{table_rows(by_opening,"title,total")}</section><section class="panel"><h2>Applications by stage</h2>{table_rows(by_stage,"stage,total")}</section></div><section class="panel" style="margin-top:18px"><h2>Applications received per week · last quarter</h2><table><tr><th>Week</th><th>Applications</th><th>Volume</th></tr>{charts}</table></section>'
+            # Source of hire reporting (stretch feature)
+            source_stats = con.execute("""
+                SELECT source, count(*) as total
+                FROM applications a
+                JOIN openings o ON o.id=a.opening_id
+                WHERE o.status='open'
+                GROUP BY source
+                ORDER BY total DESC
+            """).fetchall()
+            source_chart = "".join(
+                f'<div class="chip {a["source"].lower().replace(" ","")}">{a["source"]}: {int(x["total"])}</div>'
+                for a in source_stats
+            ) or '<div class="empty">No source data</div>'
+
+            body=f'<h1>Pipeline overview</h1><p class="muted">A live view of recruiting work across open positions.</p><div class="grid">{metric("Open positions",open_count)}{metric("Active applications",active)}{metric("Interviews scheduled this week",scheduled)}{metric("Hires this month",hires)}</div><div class="split"><section class="panel"><h2>Applications by opening</h2>{table_rows(by_opening,"title,total")}</section><section class="panel"><h2>Applications by stage</h2>{table_rows(by_stage,"stage,total")}</section></div><section class="panel" style="margin-top:18px"><h2>Applications received per week · last quarter</h2><table><tr><th>Week</th><th>Applications</th><th>Volume</th></tr>{charts}</table></section><section class="panel" style="margin-top:18px"><h2>Source of hire report</h2><p class="muted">Distribution of candidates by source</p><div class="row">{source_chart}</div></section>'
         else:
             mine=con.execute("SELECT a.*,o.title opening_title FROM applications a JOIN assignments x ON x.application_id=a.id JOIN openings o ON o.id=a.opening_id WHERE x.user_id=? ORDER BY a.updated_at DESC",(user["id"],)).fetchall()
             body=f'<h1>My interview panel</h1><p class="muted">Only applications you are assigned to appear here.</p>{application_table(mine,user)}'
