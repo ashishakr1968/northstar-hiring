@@ -1,52 +1,51 @@
 # Decisions
 
-I started this project with a 12-hour constraint, so every decision was about maximizing what I could get working in a single weekend. Here are the trade-offs I made, in the order I made them.
+I had around 12 hours for the project, so I focused on keeping the implementation simple and making sure the main requirements worked correctly. These are the main decisions I made while building it.
 
 ## Decision 1
 
-- **Chose:** Server-rendered FastAPI instead of a separate SPA/API
-- **Rejected:** React front end calling FastAPI backend via JSON endpoints
-- **Why:** A workflow app where the primary output is HTML meant a React client would duplicate all state management, filtering, sorting, and pagination logic on the frontend that FastAPI already does on the backend. More moving parts, more surface area for bugs, and for what benefit? The end user sees the same HTML either way. I rejected the React approach and kept everything server-rendered. Fewer moving parts, one language (Python) for both logic and rendering, and the HTML is generated from the one source of truth (SQLite) rather than kept in sync across a client-server boundary.
+- **Chose:** Server-rendered FastAPI
+- **Rejected:** React frontend with a separate API
+- **Why:** I decided not to add a separate React application because most of the required functionality could be handled directly by FastAPI. Search, filtering, sorting, pagination, and workflow actions are handled on the server. Using server-rendered HTML also meant fewer separate components to set up and maintain, which was useful given the time limit.
 
 ## Decision 2
 
-- **Chose:** SQLite for the runnable demo
-- **Rejected:** Requiring an account or managed database for review
-- **Why:** SQLite makes a clean clone usable immediately. I rejected requiring an account or managed database for review; the schema remains conventional enough to move to Postgres. The file just exists, the app reads it, done. No concurrent write support, limited advanced SQL, and eventually you'll hit the 10GB file size cap — but for a demo that needs to be cloned and run in under five minutes, SQLite is hard to beat.
+- **Chose:** SQLite
+- **Rejected:** A managed database such as PostgreSQL
+- **Why:** I wanted the project to be easy to clone and run without requiring another service or account. SQLite was enough for the size of the demo and made the setup much simpler. The tables and relationships are kept fairly conventional, so moving to PostgreSQL later would still be possible if the application needed to scale.
 
 ## Decision 3
 
-- **Chose:** Stage changes through one helper (`advance()`)
-- **Rejected:** Separate code paths for individual vs. bulk stage advances
-- **Why:** The bulk path accidentally sidestepped some of the same checks the individual path had — things like "rejected applications can't advance" and "Hired is final." I consolidated both routes through a single `advance()` helper function. The trade-off: the function is a tiny bit more complex because it needs to handle both code paths, but the payoff is that there's exactly one source of truth for stage-transition rules. Both the single-application advance button and the bulk action modal use the same logic, which means fewer bugs and easier future maintenance.
+- **Chose:** One helper function for stage transitions
+- **Rejected:** Separate logic for single and bulk actions
+- **Why:** I initially had some transition checks in different places, which made it easier for the bulk actions to behave differently from the individual action. I changed this so both paths use the same `advance()` function. This keeps the stage-transition rules in one place and makes it harder for one workflow to accidentally bypass a rule.
 
 ## Decision 4
 
-- **Chose:** Reject is a separate terminal state with `rejected_from`
-- **Rejected:** Resetting a rejected application back to "Applied"
-- **Why:** This preserves the exact reinstatement location. Resetting to Applied would be simpler but destroys meaningful pipeline history (the `rejected_from` field is essential for the reinstate workflow). I've seen too many hiring pipelines where reinstating a candidate means they re-apply from the beginning, losing all their previous data. This decision prevents that.
+- **Chose:** Keep rejection as a separate state using `rejected_from`
+- **Rejected:** Moving rejected candidates back to `Applied`
+- **Why:** A rejected candidate needs to be reinstated to the stage where they were rejected. If I simply changed the stage back to `Applied`, that information would be lost. The `rejected_from` field stores the previous stage so reinstatement can return the candidate to the correct place in the pipeline.
 
 ## Decision 5
 
-- **Chose:** Append-only event table for timeline and feedback
-- **Rejected:** Editable feedback records
-- **Why:** The brief requires history that cannot be rewritten. If an interviewer says " candidate was strong on technicals," and later realizes they should have mentioned "weak on culture fit," editing the old note feels wrong. Better to append a new event: "Feedback revised — added culture fit comment." This way the timeline is truly immutable, and the API stays simple: POST /feedback adds a row; there is no PUT/patch for feedback. This also simplifies the API: POST /feedback adds a row; there is no PUT/patch for feedback.
+- **Chose:** Append-only events for history and feedback
+- **Rejected:** Allowing existing feedback to be edited
+- **Why:** The assignment requires the history to be immutable. Instead of changing an existing feedback entry, a new entry can be added. This keeps the previous record intact and gives a clearer timeline of what happened. There is no update operation for existing feedback.
 
 ## Decision 6
 
-- **Chose:** Stage-keyed alert dismissals
-- **Rejected:** One dismissal flag per application
-- **Why:** My first thought was one dismissal flag per application: "this alert has been dismissed, never show it again." But what happens when the candidate advances to the next stage? If the dismissal follows them, you've suppressed a legitimate alert for the new stage. If no, the alert immediately re-appears and the user has to dismiss it all over again. I reversed it: a dismissal belongs to the application and current stage pair, and the `advance()` function clears old dismissals when the application moves to a new stage. This ensures alerts can re-fire if a candidate moves back to a previously-dismissed stage.
-- **Later reversed:** After further testing with the actual UI, the stage-keyed model proved essential for distinguishing between "alert dismissed at this stage" vs "alert dismissed forever." The stage-keyed approach lets users dismiss an alert for the current stage only, and it re-fires if the candidate moves back to that stage, which matches how the recruiter actually thinks about stale pipeline states.
+- **Chose:** Stage-specific alert dismissals
+- **Rejected:** One permanent dismissal flag per application
+- **Why:** I did not want dismissing an alert to hide future alerts for the candidate. For example, if an application is in Screening and the recruiter dismisses its stalled alert, that dismissal should not prevent an alert from appearing when the application later reaches Interview. The dismissal is therefore tied to the application and its stage. When the stage changes, the old dismissal is cleared.
 
 ## Decision 7
 
-- **Chose:** No optional feature
-- **Rejected:** Including scheduling integration, email delivery, resume parsing, scorecards, custom design system
-- **Why:** I consciously stopped after the required surface area. All of these are valuable features, but each one adds complexity, testing surface area, and decision fatigue. My rule: if it's not in the ten core goals, it ships after the core is proven correct. That's how I ended up with a plain but functional UI instead of a polished one. The core workflows (apply, advance, reject, reinstate, assign interviewer, add feedback) are all solid, and that was the priority.
+- **Chose:** Focus only on the required features
+- **Rejected:** Adding optional features such as email notifications, resume parsing, scheduling integrations, or scorecards
+- **Why:** With the time available, I decided it was more important to make the required workflows reliable than to add extra features. I focused on the main actions such as advancing candidates, rejecting and reinstating them, assigning interviewers, adding feedback, and managing the pipeline.
 
 ## Decision 8
 
-- **Chose:** Environment variable for database path (`DATABASE_PATH`)
-- **Rejected:** Not having an env var for database path
-- **Why:** This was a late addition, born from frustration. After deploying to Render and hitting that 500 Internal Server Error on the first request, I realized the app defaults to `pipeline.db` in the current working directory, but Render's free tier has an ephemeral filesystem. The database disappears between deploys or after the first sleep cycle. Adding `DATABASE_PATH` as an environment variable meant the app works locally (`export DATABASE_PATH=pipeline.db`) and on Render (set the env var in the dashboard to a persistent path like `/var/data/pipeline.db`). It's a one-line change in `app.py` (`DB_PATH = os.environ.get("DATABASE_PATH", "pipeline.db")`), but it saved me from the most common deployment failure. I added it as decision #8 retroactively, but in hindsight it should have been decision #1 — environment configuration is foundational.
+- **Chose:** Use `DATABASE_PATH` as an environment variable
+- **Rejected:** Hard-coding the database location
+- **Why:** I added this after testing the application deployment. The default database file works well locally, but deployment environments can have different filesystem behaviour. Using `DATABASE_PATH` allows the database location to be changed without modifying the code. Locally it can still use `pipeline.db`, while the deployment can provide its own path through an environment variable.
