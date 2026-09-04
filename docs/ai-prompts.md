@@ -79,12 +79,3 @@ I added this troubleshooting section to `SUBMISSION.md` after encountering
 these issues during my own Render deployment. If you're getting a 500 on
 first load, check these three things before digging into stack traces.
 
-## What I'd do differently next time
-
-- Start with `lifespan` instead of `on_event` to avoid the deprecation
-  warnings entirely.
-- Set the database path env var locally too, so `export DATABASE_PATH=pipeline.db`
-  becomes second nature and I won't forget it on Render.
-- Write the AI prompts as I go, not after the fact. It's much easier to
-  capture the reasoning while it's fresh than to retroactively explain why
-  I made certain schema choices.
