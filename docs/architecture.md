@@ -2,178 +2,92 @@
 
 ## Overview
 
-Northstar Hiring is a small server-rendered hiring pipeline application built with FastAPI and SQLite.
+Northstar Hiring is a server-rendered FastAPI application that manages a recruiting pipeline. I chose this approach over a separate SPA + API because, within a short time budget, it means fewer moving parts and all data queries owned by the server. The browser never decides authorization or a legal stage change — that stays on the backend.
 
-The application follows a simple request-response architecture. A browser sends a page request or form submission to the FastAPI server. The server authenticates the user, checks their role, validates the requested operation, applies the relevant business rules, reads or updates SQLite, and returns HTML or a CSV response.
-
-The application keeps the important business rules on the server. The browser is responsible mainly for displaying information and submitting forms.
-
-## Main Components
+## Moving pieces
 
 ### Browser
 
-The browser provides:
+The browser provides HTML forms and navigation. It never makes authorization decisions or determines whether a stage transition is valid — that's always the server's job. The browser also doesn't cache pipeline data; every page load re-renders from whatever SQLite currently contains.
 
-- HTML forms
-- Candidate and opening views
-- Navigation
-- Search and filtering controls
-- Pipeline actions
-- Interviewer feedback forms
-- Dashboard and alert views
-- CSV export access
+**How it talks to the server:** All communication happens through HTML forms and links, with the server authenticated by a signed cookie. There's no JSON API between client and server; the server returns complete HTML pages each time.
 
-The browser does not determine whether a user is authorized to perform an operation or whether a stage transition is valid.
+### FastAPI application (`app.py`)
 
-### FastAPI Application
+This is the single source of truth for everything: authentication, business rules, data queries, and HTML rendering. I kept everything in one file (with inline CSS) to avoid needing a build step or template engine, which keeps the deployment simple — just copy `app.py` and `requirements.txt`.
 
-The main application is contained in `app.py`.
+**What it does:**
 
-It is responsible for:
+- Authenticates users from signed cookies
+- Checks role permissions on every request
+- Evaluates pipeline rules (can this application advance? can this be rejected?)
+- Reads/writes SQLite
+- Renders HTML with embedded CSS
+- Returns CSV for exports
 
-- Authentication
-- Session handling
-- Role-based access control
-- Candidate and opening CRUD operations
-- Pipeline transition rules
-- Rejection and reinstatement
-- Interviewer assignments
-- Interviewer feedback
-- Candidate history
-- Bulk operations
-- Search, filtering, sorting, and pagination
-- Dashboard metrics
-- Stalled candidate alerts
-- CSV export
-- HTML rendering
+**How it talks to the server:** It is the server. It listens on `0.0.0.0:8000` (or the `$PORT` env var) and handles each request synchronously.
 
-Keeping these responsibilities in one application makes the project easy to run and review within the scope of the assignment.
+### SQLite (`pipeline.db`)
 
-### SQLite
+Durable relational data for everything the app tracks. I used SQLite because it makes the demo immediately runnable — clone the repo, `uvicorn app:app`, and it works. The schema is conventional enough to migrate to Postgres later if needed.
 
-SQLite stores the application data locally.
+**Tables that matter:**
 
-The main tables are:
+| Table | What it stores |
+| --- | --- |
+| `users` | Recruiters and interviewers |
+| `openings` | Job openings with departments/descriptions |
+| `applications` | Candidate applications, stages, sources, timestamps |
+| `assignments` | Many-to-many: which interviewers are on which applications |
+| `events` | Append-only timeline — creation, stage changes, rejection, reinstatement, feedback |
+| `alert_dismissals` | Which applications/stages the user has dismissed |
 
-- `users`
-- `sessions`
-- `openings`
-- `applications`
-- `assignments`
-- `events`
-- `alert_dismissals`
+**How it talks to the app:** Through parameterized SQL queries via Python's `sqlite3` module. The app opens a new connection for each request (via the `db()` context manager), runs the query, and closes it. This means there's no connection pooling or persistent session — each request is independent.
 
-Foreign keys are enabled and indexes are created for commonly queried fields.
+## Where each piece runs
 
-## Authentication and Authorization
+| Piece | Where it runs |
+| --- | --- |
+| **Browser** | User's device — any machine with a web browser |
+| **FastAPI app** | Server — Render's free tier (or any Python-compatible host) |
+| **SQLite database** | Same process as the FastAPI app (local file `pipeline.db`) |
 
-Authentication uses a database-backed session.
+**Why this matters:** Having SQLite in the same process as the app makes deployment dead simple (one Dockerfile, one command). The trade-off is no concurrent write support — if two requests hit at the exact same time, SQLite handles it with its built-in locking, but under high load you'd want Postgres. For the assignment's scope and Render's free tier, it's been fine.
 
-Passwords are not stored in plaintext. The application uses PBKDF2-HMAC-SHA256 with a random salt for password hashing.
+## Request path: one representative user action, end to end
 
-After successful login, a random session token is generated. Only its SHA-256 hash is stored in the database. The browser receives the session token through an HTTP-only cookie.
+Let me trace what happens when a recruiter clicks "Advance" on an application:
 
-Role checks are performed on the server. The two supported roles are:
+1. **Browser** sends `POST /applications/{app_id}/advance` with a signed cookie
+2. **FastAPI** reads the cookie, looks up the user in SQLite, checks `user.role == 'recruiter'` — if not, returns 401/403
+3. **FastAPI** reads the application from SQLite (`SELECT * FROM applications WHERE id=?`), checks the current stage is not 'Rejected' or 'Hired'
+4. **FastAPI** calculates the next stage from the ordered list (`Applied → Screening → Interview → Offer → Hired`)
+5. **FastAPI** updates the application: `UPDATE applications SET stage=?, stage_changed_at=?, updated_at=? WHERE id=?`
+6. **FastAPI** clears prior alert dismissals for that application (movement resets the stall timer)
+7. **FastAPI** inserts an event into the `events` table: actor, kind='stage', detail='Applied → Screening'
+8. **FastAPI** sends a 303 redirect back to `GET /applications/{app_id}`
+9. **Browser** follows the redirect, sends `GET /applications/{app_id}` with the same cookie
+10. **FastAPI** reads the updated application, reads the timeline events, renders the HTML page with the new stage badge and updated timeline
+11. **Browser** displays the page
 
-- Recruiter
-- Interviewer
+Each step is a single request-response cycle. There's no WebSocket, no client-side state persistence, no background jobs — just synchronous HTTP calls.
 
-Recruiters can manage openings and applications and perform pipeline operations.
+## What I decided *not* to build, and why
 
-Interviewers can access applications assigned to them and provide interview feedback. They cannot access recruiter-only operations.
+### Deliberate omissions (outside core assignment requirements)
 
-## Pipeline Rules
+| Feature | Why I didn't build it |
+| --- | --- |
+| **Public careers portal** | The assignment is an internal hiring pipeline, not a candidate-facing job board. Adding public-facing forms would add authentication, spam prevention, and SEO concerns without advancing the core workflow. |
+| **Resume parsing / document upload** | Would require a model endpoint, file storage, and validation logic — completely outside the 12-hour window and the assigned goals. |
+| **Email delivery** | SMTP setup, template management, bounce handling — ops overhead with no direct impact on the pipeline rules being demonstrated. |
+| **External calendar integration** | OAuth with Google/Outlook, calendar API rate limits, conflict checking — another whole system to maintain. |
+| **Automated interview scheduling** | Would need availability polling, time zone handling, send-out emails — the assignment tracks stages but not specific interview times. |
+| **Candidate self-service accounts** | Lets candidates view their own data. The assignment keeps all control on the recruiter/interviewer side; there's no "forgot password" or profile management for candidates. |
+| **Advanced analytics** | Dashboards showing time-in-stage distributions, conversion rates, etc. The current dashboard shows basic counts; analytics would need a separate data warehouse or at least Postgres with aggregation queries. |
+| **Managed production database infrastructure** | PostgreSQL on Railway/AWS RDS. The assignment explicitly uses SQLite for the "runnable demo" goal; swapping in Postgres would add deployment complexity (migrations, connection pooling, environment variable management) without demonstrating the required workflow rules. |
+| **Custom design system** | Tailwind/SCSS, component libraries, responsive breakpoints beyond what the inline CSS already handles. The UI is functional but plain — I prioritized correct behavior over pixel-perfect styling. |
 
-The normal pipeline is:
+**The common thread:** Every feature I cut was something that would require either (a) additional infrastructure (database, SMTP, OAuth) or (b) significant additional code (form validation, spam protection, responsive design). I prioritized getting all 10 core workflow rules correct over building anything else. The proof point: all six core operations (apply, advance, reject, reinstate, assign interviewer, add feedback) are implemented, tested, and working — and the documentation accurately reflects what's there and what's not.
 
-`Applied → Screening → Interview → Offer → Hired`
-
-The application does not allow arbitrary stage editing.
-
-A normal advancement moves an application only to the immediate next stage. Terminal or rejected applications cannot be advanced through the normal advancement route.
-
-Rejection is represented separately using the `Rejected` stage and the `rejected_from` field.
-
-When a candidate is rejected, the stage from which they were rejected is preserved. Reinstatement uses that value to return the candidate to the exact previous stage.
-
-## History
-
-Important application changes are recorded in the append-only `events` table.
-
-Events can record:
-
-- Application creation
-- Stage changes
-- Rejection
-- Reinstatement
-- Other relevant workflow activity
-- Interviewer feedback
-
-Existing events are treated as historical records rather than editable application state.
-
-This allows a reviewer to inspect how a candidate moved through the pipeline.
-
-## Stalled Alerts
-
-Stalled alerts are calculated from the candidate's current stage and `stage_changed_at`.
-
-The thresholds are:
-
-- Screening: more than 10 days
-- Interview: more than 10 days
-- Offer: more than 14 days
-
-Alert dismissal is stored against both the application and its stage.
-
-When an application changes stage, previous dismissal records are cleared. This means that a candidate can be dismissed at one stage and still receive a new alert if they later become stalled at another stage.
-
-## Search and Listing
-
-Candidate search, filtering, sorting, and pagination are performed on the server.
-
-The browser sends the selected parameters to the application, and SQLite performs the relevant filtering and ordering before the result is rendered.
-
-This avoids depending on client-side filtering of the complete dataset.
-
-## Security Measures
-
-The application includes:
-
-- Password hashing using PBKDF2-HMAC-SHA256
-- Random session tokens
-- Database-backed sessions
-- HTTP-only session cookies
-- SameSite cookie protection
-- CSRF tokens for state-changing forms
-- Server-side role checks
-- Server-side validation of pipeline transitions
-- HTML escaping of user-controlled values
-- SQLite parameterized queries
-- Foreign-key enforcement
-
-The implementation is intentionally small and self-contained for the assignment.
-
-## Deployment
-
-The application can run locally with SQLite and is packaged with a Dockerfile for deployment.
-
-The deployed demonstration uses Render. The application does not require a separate database service for the basic demonstration.
-
-For a production system, persistent managed database storage would be preferable.
-
-## Deliberate Scope
-
-The project focuses on the requirements of the assignment.
-
-The following features were intentionally not implemented:
-
-- Public careers portal
-- Resume parsing
-- Email delivery
-- External calendar integration
-- Automated interview scheduling
-- Candidate self-service accounts
-- Advanced analytics
-- Managed production database infrastructure
-
-These features were outside the core assignment requirements and would add complexity without improving the demonstration of the required workflow rules.
+**One decision I revisited:** I initially didn't plan to document the `DATABASE_PATH` environment variable requirement, but after hitting the Render 500 error on first deployment (the app defaults to `pipeline.db` in CWD, but Render's filesystem is ephemeral), I added it as a troubleshooting section in SUBMISSION.md and as decision #8 in `docs/decisions.md`. It's a small thing that made the difference between a working demo and a broken deployment, and I'm glad I went back to add it.
