@@ -1,59 +1,66 @@
-# Plan and execution record
+# Plan and Execution Record
 
-I split the development work into six focused sessions over roughly 12 hours total. The ordering was intentional: I wanted to get the data model and authentication working first, because every later view depends on the same truth. If I had built the dashboard UI before the pipeline rules were solid, I would have had to rewrite half the HTML templates once the stage logic was correct.
+I initially planned to complete the project in around 12 hours, but I ended up spending about 16 hours in total. The extra time mainly went into testing, documentation, and deployment troubleshooting. I divided the work into six main sessions and tried to build the project in an order where the basic data and workflow rules were working before moving on to reporting, alerts, and deployment.
 
-## How I broke the work into sessions
+## How I Broke the Work Into Sessions
 
-1. **Model and authentication** — SQLite schema, user model, password hashing, login form and route. This was the foundation. I needed the user table, the login route, and the signed-cookie authentication system before anything else could work. I also seeded the demo data (recruiter/interviewer users, job openings, one application in "Applied" stage) so I could actually test the app while building on top of it.
+1. **Data model and authentication** — I set up the SQLite database, user model, password hashing, login form, and authentication. I also added seed data for the recruiter and interviewer accounts, job openings, and applications so I could test the application while building it.
 
-2. **Openings/applications CRUD** — Create/read/edit/delete for job openings and applications with stage tracking. Once I had users and auth, I needed the core CRUD: openings (with title, department, description, status), and applications (candidate name, email, source, stage). This gave me something to look at in the browser — a list of applications, a way to add new ones.
+2. **Openings and applications** — I added the basic functionality for creating, viewing, editing, and deleting job openings and applications. Applications also got their stage information so I could start testing the hiring pipeline.
 
-3. **Pipeline and interview permissions** — Stage advancement rules, rejection/reinstatement, assignment of interviewers, per-user application filtering. This is where the business rules live. I built the `advance()` helper, the reject/reinstate routes, the assignments many-to-many table, and the per-user filtering that makes the dashboard show different things for recruiters vs interviewers. I also verified all six core workflow rules work: apply, advance, reject, reinstate, assign interviewer, add feedback.
+3. **Pipeline and permissions** — I implemented the stage transition rules, rejection and reinstatement, interviewer assignments, and role-based access. I also added the `advance()` helper so that stage changes use the same rules for individual and bulk actions.
 
-4. **Search/bulk/export** — Filtering, sorting, pagination, bulk advance/reject, CSV export of pipeline data. I added the filter sidebar on the applications page (search by name/email, select opening, select stage, select source), the 20-per-page pagination, the bulk action buttons (advance/reject selected), and the CSV export endpoint. This session also gave me the source-of-hire reporting charts.
+4. **Search, bulk actions, and export** — I added server-side search, filtering, sorting, and pagination. I also added bulk advance/reject actions and CSV export for the pipeline data.
 
-5. **Dashboard/alerts** — Pipeline overview dashboard, source reporting, stalled-application alerts with 10-day timeout, alert dismissal. I built the dashboard page that shows metrics (open positions, active applications, interviews scheduled this week, hires this month), the source chip grid, the applications-by-opening and applications-by-stage tables, the weekly application volume chart, and the stalled-alert alerts that appear when a candidate has been in the same stage for 10 days. I also built the dismiss-alert functionality.
+5. **Dashboard and alerts** — I worked on the dashboard, reporting, and stalled-application alerts. This included the pipeline metrics, source reporting, applications by opening and stage, weekly application volume, and alert dismissal.
 
-6. **Tests, documentation, and deployment packaging** — Unit tests, all doc files, Dockerfile, Render deployment, environment variables, troubleshooting guide. I wrote the two pytest tests for advance/reject, updated all the markdown docs (architecture, schema, decisions, plan, AI prompts), fixed the Dockerfile, added the `DATABASE_PATH` environment variable requirement, and wrote the troubleshooting section for Render 500 errors.
+6. **Testing, documentation, and deployment** — I finished the tests and documentation, prepared the Docker setup, and deployed the application. I also added the `DATABASE_PATH` environment variable and spent time troubleshooting deployment issues.
 
-## What order did I build in, and why that order
+## Why I Used This Order
 
-I deliberately ordered the sessions so that irreversible data rules came before dashboard polish. The data model and authentication had to be first because every later view depends on the same truth — if the schema was wrong, every page would show wrong data. The pipeline rules (advance, reject, reinstate) had to come before the dashboard, because the dashboard reads the pipeline state. The search/bulk/export and dashboard/alerts sessions could be somewhat independent, but I still wanted the pipeline rules solid first so the search and filters were operating on correct data. The tests/docs/deployment session was last because it needs the app to be working end-to-end, and because documenting the trade-offs and deployment quirks (like the `DATABASE_PATH` env var) benefits from having actually deployed and hit the bugs.
+I wanted the database and authentication to be working before building the rest of the application because all the other features depend on them. I then worked on the pipeline rules before the dashboard so that the dashboard would be based on the correct application states.
 
-## Estimated vs. intended allocation
+After the main workflow was working, I added search, bulk actions, export, reporting, and alerts. Testing and documentation came towards the end because it was easier to check and document the final implementation once the application was working end-to-end.
 
-| Area | Estimated | Intended |
-| --- | --- | --- |
+## Estimated vs. Actual Time
+
+| Area | Estimated | Actual |
+| --- | ---: | ---: |
 | Data model and routes | 3h | 3h |
 | Core UI (HTML forms, tables) | 2h | 2h |
-| Permissions and pipeline rules | 2h | 2h |
+| Permissions and pipeline rules | 2h | 3h |
 | Reporting and alerts | 2h | 2h |
-| Tests, docs, and deployment | 3h | 4h (includes this documentation update) |
+| Tests, documentation, and deployment | 3h | 6h |
+| **Total** | **12h** | **16h** |
 
-The estimates were mostly on the mark. The one area that ran long was the documentation and deployment packaging — not because the code was hard, but because I kept running into the Render deployment issues (ephemeral filesystem, `DATABASE_PATH` env var, `@app.on_event("startup")` deprecation) and had to add troubleshooting sections to both `SUBMISSION.md` and the docs. I also ended up writing the AI prompt record and the decisions log, which I hadn't initially planned to write this formally. The actual code time was very close to the estimates, but the documentation and deployment packaging ate into the buffer I had planned.
+The original estimate was around 12 hours, but the project took about 16 hours in total. The main difference was the final testing, documentation, and deployment work. I spent more time than expected checking the application after deployment and fixing configuration issues. I also spent additional time making sure the documentation matched the final implementation.
 
-## What did I cut when I ran short
+## What I Cut When I Ran Short on Time
 
-I consciously decided not to build anything outside the ten core goals, but there were specific features I'm glad I cut:
+I decided to focus on the required features rather than adding extra functionality. Some of the features I considered but did not implement were:
 
-- **Public careers portal**: A candidate-facing job board with application tracking for applicants who aren't in the system. The assignment is an internal hiring pipeline, not a public job board, and adding this would require authentication, spam prevention, and SEO concerns.
+- **Public careers portal:** This would have added a separate candidate-facing part of the application that was not required for the assignment.
 
-- **Resume parsing / document upload**: Would require a model endpoint, file storage, and validation logic — completely outside the 12-hour window and the assigned goals.
+- **Resume parsing and document upload:** This would require additional file handling, storage, and validation.
 
-- **Email delivery**: SMTP setup, template management, bounce handling — ops overhead with no direct impact on the pipeline rules being demonstrated.
+- **Email notifications:** Setting up SMTP, email templates, and delivery handling would have taken time without directly improving the required workflow.
 
-- **External calendar integration**: OAuth with Google/Outlook, calendar API rate limits, conflict checking — another whole system to maintain.
+- **External calendar integration:** Integrating Google or Outlook calendars would add OAuth and external API dependencies.
 
-- **Automated interview scheduling**: Would need availability polling, time zone handling, send-out emails — the assignment tracks stages but not specific interview times.
+- **Automated interview scheduling:** This would require handling availability, time zones, conflicts, and notifications.
 
-- **Candidate self-service accounts**: Lets candidates view their own data, "forgot password" flows, profile management for candidates. The assignment keeps all control on the recruiter/interviewer side.
+- **Candidate self-service accounts:** Candidate accounts and password-reset functionality were outside the scope of the assignment.
 
-- **Advanced analytics**: Dashboards showing time-in-stage distributions, conversion rates, etc. The current dashboard shows basic counts; analytics would need a separate data warehouse or at least Postgres with aggregation queries.
+- **Advanced analytics:** I kept the dashboard focused on the required metrics instead of adding more detailed conversion and time-in-stage analysis.
 
-- **Managed production database infrastructure**: PostgreSQL on Railway/AWS RDS. The assignment explicitly uses SQLite for the "runnable demo" goal; swapping in Postgres would add deployment complexity (migrations, connection pooling, environment variable management) without demonstrating the required workflow rules.
+- **Managed production database:** I kept SQLite for the runnable demo because it makes the project easier to set up and review.
 
-- **Custom design system**: Tailwind/SCSS, component libraries, responsive breakpoints beyond what the inline CSS already handles. The UI is functional but plain — I prioritized correct behavior over pixel-perfect staging.
+- **Custom design system:** I focused on making the interface functional and responsive rather than spending a large part of the available time on visual design.
 
-**The common thread**: Every feature I cut was something that would require either (a) additional infrastructure (database, SMTP, OAuth) or (b) significant additional code (form validation, spam protection, responsive design). I prioritized getting all 10 core workflow rules correct over building anything else. The proof point: all six core workflow rules (apply, advance, reject, reinstate, assign interviewer, add feedback) are implemented and tested, and the documentation accurately reflects what's there and what's not.
+The main idea was to make sure the required workflow was working before adding optional features. Given the time limit, I felt this was a better use of the available time.
 
-If I had another 12 hours, the things I'd add are: Postgres migration with proper indexes, Argon2/bcrypt password hashing, API endpoints with OpenAPI/Swagger docs, email notification triggers for stage changes, scheduling/calendar integration, and a custom design system with better typography and spacing. But for the assignment's constraints, cutting everything outside the core goals was the right call.
+## If I Had Another 12 Hours
+
+If I had another 12 hours, I would mainly use it to improve the parts that were kept simple for the demo. I would consider moving the database to PostgreSQL, improving the password-hashing setup, adding email notifications for important stage changes, improving the UI and design, and adding more tests around permissions, bulk actions, and edge cases.
+
+I would also spend more time on deployment and production configuration so that the application would be easier to operate outside the assignment environment.
