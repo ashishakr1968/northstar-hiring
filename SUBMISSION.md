@@ -1,7 +1,7 @@
 # Submission
 
 - Repository: https://github.com/ashishakr1968/northstar-hiring
-- Live application: https://northstar-hiring.onrender.com
+- Live application: https://northstar-hiring.onrender.com/login
 - The local demo is seeded at first start.
 
 ## Demo credentials
