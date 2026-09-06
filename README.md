@@ -2,7 +2,7 @@
 
 Northstar Hiring is a server-rendered FastAPI application for managing jobs, candidates, interviews, feedback, and hiring-stage transitions using SQLite.
 
-**Live Demo:** https://northstar-hiring.onrender.com
+**Live Demo:** https://northstar-hiring.onrender.com/login
 
 ## Features
 
